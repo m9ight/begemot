@@ -50,10 +50,7 @@ app.get('/admin', (req, res) => res.sendFile(path.join(PUBLIC, 'admin.html')));
     stmts.createHippo.run(hippoId, id, 'АдминБег', '🦛', 'mythic',
       JSON.stringify({ str: 99, agi: 99, int: 99, vit: 99, lck: 99 }),
       JSON.stringify(['fire', 'berserk', 'vampire']),
-<<<<<<< HEAD
-=======
       JSON.stringify([]),
->>>>>>> 3a33a7f (first commit)
       JSON.stringify({ weapon: null, armor: null, accessory: null, artifact: null }));
     console.log('✅ Admin account created: login=admin / password=admintest');
   } else if (!existing.is_admin) {
