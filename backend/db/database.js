@@ -149,17 +149,14 @@ db.exec(`
   );
 `);
 
-<<<<<<< HEAD
 // Add is_admin / is_banned columns if upgrading from old DB
 try { db.exec(`ALTER TABLE players ADD COLUMN is_admin INTEGER DEFAULT 0`); } catch {}
 try { db.exec(`ALTER TABLE players ADD COLUMN is_banned INTEGER DEFAULT 0`); } catch {}
-=======
 // Add columns for upgrading old DB (safe: ignored if already exist)
 try { db.exec(`ALTER TABLE players ADD COLUMN is_admin INTEGER DEFAULT 0`); } catch {}
 try { db.exec(`ALTER TABLE players ADD COLUMN is_banned INTEGER DEFAULT 0`); } catch {}
 try { db.exec(`ALTER TABLE hippos ADD COLUMN upgrade_count INTEGER DEFAULT 0`); } catch {}
 try { db.exec(`ALTER TABLE hippos ADD COLUMN abilities TEXT DEFAULT '[]'`); } catch {}
->>>>>>> 3a33a7f (first commit)
 
 const stmts = {
   // Players
@@ -182,15 +179,12 @@ const stmts = {
   getStats: db.prepare(`SELECT (SELECT COUNT(*) FROM players) as total_players, (SELECT COUNT(*) FROM hippos) as total_hippos, (SELECT COUNT(*) FROM battles) as total_battles, (SELECT COUNT(*) FROM clans) as total_clans`),
 
   // Hippos
-<<<<<<< HEAD
   createHippo: db.prepare(`INSERT INTO hippos (id, owner_id, name, emoji, rarity, stats, mutations, equipped) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`),
   getHipposByOwner: db.prepare(`SELECT * FROM hippos WHERE owner_id = ?`),
   updateHippo: db.prepare(`UPDATE hippos SET name=?, level=?, xp=?, deaths=?, wins=?, losses=?, stats=?, mutations=?, equipped=?, in_valhalla=? WHERE id=?`),
-=======
   createHippo: db.prepare(`INSERT INTO hippos (id, owner_id, name, emoji, rarity, stats, mutations, abilities, equipped) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`),
   getHipposByOwner: db.prepare(`SELECT * FROM hippos WHERE owner_id = ?`),
   updateHippo: db.prepare(`UPDATE hippos SET name=?, level=?, xp=?, deaths=?, wins=?, losses=?, upgrade_count=?, stats=?, mutations=?, abilities=?, equipped=?, in_valhalla=? WHERE id=?`),
->>>>>>> 3a33a7f (first commit)
   deleteHippo: db.prepare(`DELETE FROM hippos WHERE id = ? AND owner_id = ?`),
 
   // Inventory
@@ -224,10 +218,7 @@ const stmts = {
 
   // Friends
   addFriend: db.prepare(`INSERT INTO friendships (id, player_id, friend_id, sender_id, status) VALUES (?, ?, ?, ?, 'pending')`),
-<<<<<<< HEAD
-=======
   checkFriendship: db.prepare(`SELECT * FROM friendships WHERE (player_id=? AND friend_id=?) OR (player_id=? AND friend_id=?) LIMIT 1`),
->>>>>>> 3a33a7f (first commit)
   getFriendships: db.prepare(`
     SELECT f.*, p.username, p.avatar, p.level, p.elo, p.wins
     FROM friendships f
