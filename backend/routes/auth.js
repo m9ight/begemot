@@ -26,12 +26,9 @@ router.post('/register', async (req, res) => {
     stmts.createHippo.run(
       starterHippo.id, id, starterHippo.name, starterHippo.emoji,
       starterHippo.rarity, JSON.stringify(starterHippo.stats),
-<<<<<<< HEAD
       JSON.stringify(starterHippo.mutations), JSON.stringify(starterHippo.equipped)
-=======
       JSON.stringify(starterHippo.mutations), JSON.stringify([]),
       JSON.stringify(starterHippo.equipped)
->>>>>>> 3a33a7f (first commit)
     );
 
     const token = jwt.sign({ id, username }, JWT_SECRET, { expiresIn: '30d' });
