@@ -41,15 +41,12 @@ db.exec(`
     deaths INTEGER DEFAULT 0,
     wins INTEGER DEFAULT 0,
     losses INTEGER DEFAULT 0,
-<<<<<<< HEAD
     stats TEXT NOT NULL DEFAULT '{}',
     mutations TEXT DEFAULT '[]',
-=======
     upgrade_count INTEGER DEFAULT 0,
     stats TEXT NOT NULL DEFAULT '{}',
     mutations TEXT DEFAULT '[]',
     abilities TEXT DEFAULT '[]',
->>>>>>> 3a33a7f (first commit)
     equipped TEXT DEFAULT '{}',
     in_valhalla INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
