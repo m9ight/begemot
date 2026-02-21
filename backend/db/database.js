@@ -41,8 +41,6 @@ db.exec(`
     deaths INTEGER DEFAULT 0,
     wins INTEGER DEFAULT 0,
     losses INTEGER DEFAULT 0,
-    stats TEXT NOT NULL DEFAULT '{}',
-    mutations TEXT DEFAULT '[]',
     upgrade_count INTEGER DEFAULT 0,
     stats TEXT NOT NULL DEFAULT '{}',
     mutations TEXT DEFAULT '[]',
@@ -146,10 +144,7 @@ db.exec(`
   );
 `);
 
-// Add is_admin / is_banned columns if upgrading from old DB
-try { db.exec(`ALTER TABLE players ADD COLUMN is_admin INTEGER DEFAULT 0`); } catch {}
-try { db.exec(`ALTER TABLE players ADD COLUMN is_banned INTEGER DEFAULT 0`); } catch {}
-// Add columns for upgrading old DB (safe: ignored if already exist)
+// Safe migrations for existing databases (ignored if columns already exist)
 try { db.exec(`ALTER TABLE players ADD COLUMN is_admin INTEGER DEFAULT 0`); } catch {}
 try { db.exec(`ALTER TABLE players ADD COLUMN is_banned INTEGER DEFAULT 0`); } catch {}
 try { db.exec(`ALTER TABLE hippos ADD COLUMN upgrade_count INTEGER DEFAULT 0`); } catch {}
@@ -176,9 +171,6 @@ const stmts = {
   getStats: db.prepare(`SELECT (SELECT COUNT(*) FROM players) as total_players, (SELECT COUNT(*) FROM hippos) as total_hippos, (SELECT COUNT(*) FROM battles) as total_battles, (SELECT COUNT(*) FROM clans) as total_clans`),
 
   // Hippos
-  createHippo: db.prepare(`INSERT INTO hippos (id, owner_id, name, emoji, rarity, stats, mutations, equipped) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`),
-  getHipposByOwner: db.prepare(`SELECT * FROM hippos WHERE owner_id = ?`),
-  updateHippo: db.prepare(`UPDATE hippos SET name=?, level=?, xp=?, deaths=?, wins=?, losses=?, stats=?, mutations=?, equipped=?, in_valhalla=? WHERE id=?`),
   createHippo: db.prepare(`INSERT INTO hippos (id, owner_id, name, emoji, rarity, stats, mutations, abilities, equipped) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`),
   getHipposByOwner: db.prepare(`SELECT * FROM hippos WHERE owner_id = ?`),
   updateHippo: db.prepare(`UPDATE hippos SET name=?, level=?, xp=?, deaths=?, wins=?, losses=?, upgrade_count=?, stats=?, mutations=?, abilities=?, equipped=?, in_valhalla=? WHERE id=?`),
