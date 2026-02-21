@@ -26,7 +26,6 @@ router.post('/register', async (req, res) => {
     stmts.createHippo.run(
       starterHippo.id, id, starterHippo.name, starterHippo.emoji,
       starterHippo.rarity, JSON.stringify(starterHippo.stats),
-      JSON.stringify(starterHippo.mutations), JSON.stringify(starterHippo.equipped)
       JSON.stringify(starterHippo.mutations), JSON.stringify([]),
       JSON.stringify(starterHippo.equipped)
     );
