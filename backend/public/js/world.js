@@ -1,4 +1,123 @@
 // ========================
+// HELPERS — parse JSON fields from server
+// ========================
+function getHippoAbilities(h) {
+  if (!h) return [];
+  if (Array.isArray(h.abilities)) return h.abilities;
+  try { return JSON.parse(h.abilities || '[]'); } catch { return []; }
+}
+function getHippoMutations(h) {
+  if (!h) return [];
+  if (Array.isArray(h.mutations)) return h.mutations;
+  try { return JSON.parse(h.mutations || '[]'); } catch { return []; }
+}
+
+// Recent case drops feed (global)
+const RECENT_DROPS = [];
+function pushRecentDrop(playerName, hippo) {
+  if (!['rare','epic','legendary','mythic'].includes(hippo.rarity)) return;
+  RECENT_DROPS.unshift({ playerName, hippo, time: Date.now() });
+  if (RECENT_DROPS.length > 20) RECENT_DROPS.pop();
+  // Re-render feed if cases tab is active
+  const feedDiv = document.getElementById('recent-drops-feed');
+  if (feedDiv) renderRecentDropsFeed(feedDiv);
+}
+function renderRecentDropsFeed(div) {
+  if (!div) return;
+  if (!RECENT_DROPS.length) { div.innerHTML = '<div style="color:var(--text3);font-size:11px;padding:6px">Пока никто ничего не открыл</div>'; return; }
+  div.innerHTML = RECENT_DROPS.slice(0,10).map(d => `
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:${d.hippo.rarity==='mythic'?'rgba(255,0,128,0.08)':d.hippo.rarity==='legendary'?'rgba(255,107,0,0.08)':'rgba(168,85,247,0.05)'};border-left:3px solid ${getRarityColor(d.hippo.rarity)};border-radius:0 8px 8px 0;margin-bottom:4px;animation:fadeIn .3s">
+      <span style="font-size:18px">${d.hippo.emoji}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:11px;font-weight:700;color:${getRarityColor(d.hippo.rarity)}">${d.hippo.name}</div>
+        <div style="font-size:10px;color:var(--text2)">🎰 <b>${d.playerName}</b> · ${getRarityName(d.hippo.rarity)}</div>
+      </div>
+      <div style="font-size:9px;color:var(--text3)">${Math.round((Date.now()-d.time)/1000)}с</div>
+    </div>
+  `).join('');
+}
+
+// Socket listeners for world events (called after initSocket)
+function initWorldSocketListeners() {
+  const tryInit = () => {
+    const s = window.hwSocket;
+    if (!s) { setTimeout(tryInit, 500); return; }
+
+    // Admin gave resources
+    s.on('resource_update', ({ coins, gems, level, message }) => {
+      if (coins !== undefined) G.coins = coins;
+      if (gems !== undefined) G.gems = gems;
+      if (level !== undefined) G.level = level;
+      updateHeader();
+      saveGame();
+      toast(`🎁 ${message || 'Администратор выдал ресурсы!'}`, 'legendary', 4000);
+    });
+
+    // Boss lobby invite
+    s.on('boss_lobby_invite', ({ from_name, lobby_id, boss_name }) => {
+      toast(`👹 ${from_name} приглашает в Босс-файт: ${boss_name}!`, 'legendary', 8000);
+      // Show clickable notification
+      const notifBar = document.createElement('div');
+      notifBar.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--bg2);border:2px solid var(--accent);border-radius:14px;padding:14px 20px;z-index:9999;display:flex;align-items:center;gap:12px;box-shadow:0 4px 24px rgba(0,0,0,0.5)';
+      notifBar.innerHTML = `
+        <span style="font-size:28px">👹</span>
+        <div>
+          <div style="font-weight:700;font-size:13px">${from_name} зовёт в Босс-файт!</div>
+          <div style="font-size:11px;color:var(--text2)">Босс: ${boss_name}</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="joinBossLobbyById('${lobby_id}');this.parentNode.remove()">⚔️ Войти</button>
+        <button class="btn btn-secondary btn-sm" onclick="this.parentNode.remove()">✕</button>
+      `;
+      document.body.appendChild(notifBar);
+      setTimeout(() => notifBar.remove && notifBar.remove(), 15000);
+    });
+
+    // Clan invite
+    s.on('clan_invite', ({ from_name, clan }) => {
+      toast(`🏰 ${from_name} приглашает в клан ${clan?.name}!`, 'success', 8000);
+      const notifBar = document.createElement('div');
+      notifBar.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--bg2);border:2px solid var(--success);border-radius:14px;padding:14px 20px;z-index:9999;display:flex;align-items:center;gap:12px;box-shadow:0 4px 24px rgba(0,0,0,0.5)';
+      notifBar.innerHTML = `
+        <span style="font-size:28px">${clan?.emoji||'🏰'}</span>
+        <div>
+          <div style="font-weight:700;font-size:13px">${from_name} зовёт в клан!</div>
+          <div style="font-size:11px;color:var(--text2)">${clan?.name}</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="joinClan('${clan?.id}','${clan?.name}','${clan?.emoji}','${from_name}');this.parentNode.remove()">🏰 Вступить</button>
+        <button class="btn btn-secondary btn-sm" onclick="this.parentNode.remove()">✕</button>
+      `;
+      document.body.appendChild(notifBar);
+      setTimeout(() => notifBar.remove && notifBar.remove(), 15000);
+    });
+
+    // Ban / delete from admin
+    s.on('banned', ({ reason }) => {
+      // Clear everything and show ban screen
+      document.body.innerHTML = `
+        <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0d0d0d;font-family:sans-serif">
+          <div style="text-align:center;padding:40px;max-width:420px">
+            <div style="font-size:72px;margin-bottom:16px">🔒</div>
+            <div style="font-size:24px;font-weight:900;color:#ef4444;margin-bottom:12px">АККАУНТ ЗАБЛОКИРОВАН</div>
+            <div style="font-size:14px;color:#9ca3af;line-height:1.7;margin-bottom:24px">
+              ${reason === 'Аккаунт удалён'
+                ? 'Твой аккаунт был удалён администратором.'
+                : 'Аккаунт заблокирован.<br>Для связи с администратором напишите казаху.'}
+            </div>
+            ${reason === 'Аккаунт удалён'
+              ? `<a href="/" style="display:inline-block;background:#7c3aed;color:#fff;padding:12px 28px;border-radius:10px;font-weight:700;text-decoration:none">← Регистрация</a>`
+              : `<div style="color:#6b7280;font-size:12px">Обратитесь в поддержку для разблокировки</div>`}
+          </div>
+        </div>`;
+      if (G && G.token) {
+        G.token = null;
+        try { localStorage.removeItem('hippowars_save'); } catch {}
+      }
+    });
+  };
+  tryInit();
+}
+
+// ========================
 // HOME
 // ========================
 function renderHome() {
@@ -105,6 +224,22 @@ function renderCases() {
   document.getElementById('total-opens').textContent = G.totalOpens;
   document.getElementById('legendary-opens').textContent = G.legendaryOpens;
   document.getElementById('mythic-opens').textContent = G.mythicOpens;
+
+  // Recent drops feed
+  const statsCard = document.querySelector('#tab-cases .card:last-child');
+  if (statsCard && !document.getElementById('recent-drops-card')) {
+    const feedCard = document.createElement('div');
+    feedCard.className = 'card';
+    feedCard.style.marginTop = '16px';
+    feedCard.id = 'recent-drops-card';
+    feedCard.innerHTML = `
+      <div class="card-title">🎰 Последние выпадения игроков</div>
+      <div id="recent-drops-feed" style="max-height:220px;overflow-y:auto"></div>
+    `;
+    statsCard.parentNode.insertBefore(feedCard, statsCard.nextSibling);
+  }
+  const feedDiv = document.getElementById('recent-drops-feed');
+  if (feedDiv) renderRecentDropsFeed(feedDiv);
 }
 
 function showCaseOdds(caseId) {
@@ -189,6 +324,7 @@ function spinReel(winner, caseId, rarity, fast) {
     G.totalOpens++;
     if (rarity==='legendary') G.legendaryOpens++;
     if (rarity==='mythic') G.mythicOpens++;
+    pushRecentDrop(G.playerName, winner);
     addXP(15); updateHeader(); saveGame();
 
     if (G.quests[1]) G.quests[1].progress = Math.min(G.quests[1].goal, (G.quests[1].progress||0)+1);
@@ -620,30 +756,40 @@ function showHippoDetail(idx) {
       ` : `<div style="font-size:10px;color:var(--text3);margin:6px 0">${(h.upgradeCount||0)>=limit?'✦ Лимит апгрейда достигнут':'🧭 В экспедиции'}</div>`}
 
       <div class="divider"></div>
-      <div class="card-title" style="font-size:11px">🧬 Мутации (${(h.mutations||[]).length}/3)</div>
-      ${(h.mutations||[]).length ? (h.mutations||[]).map(mId=>{
-        const m=MUTATIONS.find(x=>x.id===mId);
-        return m?`<div style="display:flex;align-items:center;gap:8px;padding:5px;background:var(--bg3);border-radius:7px;font-size:10px;margin-bottom:3px">${m.emoji}<div><strong>${m.name}</strong><div style="color:var(--text2)">${m.desc}</div></div></div>`:'';
-      }).join('') : '<div style="font-size:11px;color:var(--text3)">Нет мутаций</div>'}
-      ${(h.mutations||[]).length < 3 && !inExp ? `<button class="btn btn-xs btn-purple" onclick="tryMutation(${idx})" style="margin-top:6px">🧬 Мутация (💎50)</button>` : ''}
+      ${(() => {
+        const muts = getHippoMutations(h);
+        return `
+        <div class="card-title" style="font-size:11px">🧬 Мутации (${muts.length}/3)</div>
+        ${muts.length ? muts.map(mId=>{
+          const m=MUTATIONS.find(x=>x.id===mId);
+          return m?`<div style="display:flex;align-items:center;gap:8px;padding:5px;background:var(--bg3);border-radius:7px;font-size:10px;margin-bottom:3px">${m.emoji}<div style="flex:1"><strong>${m.name}</strong><div style="color:var(--text2)">${m.desc}</div></div></div>`:'';
+        }).join('') : '<div style="font-size:11px;color:var(--text3)">Нет мутаций</div>'}
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:5px">
+          ${muts.length < 3 && !inExp ? `<button class="btn btn-xs btn-purple" onclick="tryMutation(${idx})">🧬 Мутация (💎50)</button>` : ''}
+          ${muts.length > 0 && !inExp ? `<button class="btn btn-xs btn-danger" onclick="clearMutations(${idx})">🗑️ Очистить (💎30)</button>` : ''}
+        </div>`;
+      })()}
 
       <div class="divider"></div>
-      <div class="card-title" style="font-size:11px">⚡ Способности (${(h.abilities||[]).length}/2)</div>
-      ${(h.abilities||[]).length ? (h.abilities||[]).map((abId,ai) => {
-        const ab = ABILITIES.find(x=>x.id===abId);
-        return ab ? `
-          <div style="display:flex;align-items:center;gap:8px;padding:6px;background:var(--bg3);border-radius:8px;margin-bottom:4px;font-size:11px">
-            <span style="font-size:18px">${ab.emoji}</span>
-            <div style="flex:1">
-              <div style="font-weight:700">${ab.name}</div>
-              <div style="font-size:10px;color:var(--text2)">${ab.desc}</div>
-              <div style="font-size:9px;color:${getRarityColor(ab.rarity)}">${getRarityName(ab.rarity)}</div>
-            </div>
-            <button class="btn btn-xs btn-danger" onclick="removeAbility(${idx},${ai})">✕</button>
-          </div>` : '';
-      }).join('') : '<div style="font-size:11px;color:var(--text3)">Нет способностей</div>'}
-      ${(h.abilities||[]).length < 2 && !inExp ? `
-        <button class="btn btn-xs btn-gold" onclick="openAbilityShop(${idx})" style="margin-top:5px">✨ Купить способность</button>` : ''}
+      ${(() => {
+        const abs = getHippoAbilities(h);
+        return `
+        <div class="card-title" style="font-size:11px">⚡ Способности (${abs.length}/2)</div>
+        ${abs.length ? abs.map((abId,ai) => {
+          const ab = ABILITIES.find(x=>x.id===abId);
+          return ab ? `
+            <div style="display:flex;align-items:center;gap:8px;padding:6px;background:var(--bg3);border-radius:8px;margin-bottom:4px;font-size:11px">
+              <span style="font-size:18px">${ab.emoji}</span>
+              <div style="flex:1">
+                <div style="font-weight:700">${ab.name}</div>
+                <div style="font-size:10px;color:var(--text2)">${ab.desc}</div>
+                <div style="font-size:9px;color:${getRarityColor(ab.rarity)}">${getRarityName(ab.rarity)}</div>
+              </div>
+              <button class="btn btn-xs btn-danger" onclick="removeAbility(${idx},${ai})">✕</button>
+            </div>` : '';
+        }).join('') : '<div style="font-size:11px;color:var(--text3)">Нет способностей</div>'}
+        ${abs.length < 2 && !inExp ? `<button class="btn btn-xs btn-gold" onclick="openAbilityShop(${idx})" style="margin-top:5px">✨ Купить способность</button>` : ''}`;
+      })()}
 
       <div class="divider"></div>
         ${!inExp && !h.inValhalla ? `<button class="btn btn-sm btn-primary" onclick="selectAsFighter(${idx})">⚔️ Боец</button>` : ''}
@@ -751,17 +897,32 @@ function toggleProtect(idx) {
 function removeAbility(hippoIdx, abilityIdx) {
   const h = G.hippos[hippoIdx];
   if (!h) return;
-  const ab = ABILITIES.find(x=>x.id===h.abilities[abilityIdx]);
+  const abilities = getHippoAbilities(h);
+  const ab = ABILITIES.find(x=>x.id===abilities[abilityIdx]);
   if (!confirm(`Убрать способность ${ab?.name||''}?`)) return;
-  h.abilities.splice(abilityIdx, 1);
+  abilities.splice(abilityIdx, 1);
+  h.abilities = abilities;
   saveGame(); showHippoDetail(hippoIdx);
   toast('✕ Способность убрана', 'success');
+}
+
+function clearMutations(hippoIdx) {
+  const h = G.hippos[hippoIdx];
+  if (!h) return;
+  const muts = getHippoMutations(h);
+  if (!muts.length) { toast('Нет мутаций', 'error'); return; }
+  if (G.gems < 30) { toast('Нужно 💎 30', 'error'); return; }
+  if (!confirm(`Очистить все ${muts.length} мутаций? Стоимость: 💎30`)) return;
+  G.gems -= 30;
+  h.mutations = [];
+  toast('🧬 Все мутации очищены', 'success');
+  saveGame(); updateHeader(); showHippoDetail(hippoIdx);
 }
 
 function openAbilityShop(hippoIdx) {
   const h = G.hippos[hippoIdx];
   if (!h) return;
-  const equipped = h.abilities || [];
+  const equipped = getHippoAbilities(h);
   const available = ABILITIES.filter(ab => !equipped.includes(ab.id));
   const rarityPrices = { uncommon:200, rare:500, epic:1200, legendary:3000, mythic:8000 };
   openModal('✨ Способности', `
@@ -788,10 +949,12 @@ function openAbilityShop(hippoIdx) {
 function buyAbility(abilId, hippoIdx, price) {
   const h = G.hippos[hippoIdx];
   if (!h) return;
-  if ((h.abilities||[]).length >= 2) { toast('Максимум 2 способности!', 'error'); return; }
+  const abilities = getHippoAbilities(h);
+  if (abilities.length >= 2) { toast('Максимум 2 способности!', 'error'); return; }
   if (G.coins < price) { toast(`Нужно 🪙${price}`, 'error'); return; }
   G.coins -= price;
-  h.abilities = [...(h.abilities||[]), abilId];
+  abilities.push(abilId);
+  h.abilities = abilities;
   const ab = ABILITIES.find(x=>x.id===abilId);
   toast(`✨ ${ab?.emoji||''} ${ab?.name} изучена!`, 'legendary', 4000);
   closeModal(); saveGame(); updateHeader(); showHippoDetail(hippoIdx);
@@ -976,8 +1139,10 @@ function claimKingdom(regionId) {
 }
 
 // ========================
-// CLANS (reworked)
+// CLANS (reworked — auto war with cooldown)
 // ========================
+let _clanWarCooldown = 0; // timestamp when next attack available
+
 function renderClans() {
   const div = document.getElementById('tab-clans');
   if (!div) return;
@@ -1006,7 +1171,6 @@ function renderClans() {
 }
 
 async function loadClans() {
-  // My clan
   const myDiv = document.getElementById('my-clan-content');
   if (G.clan) {
     myDiv.innerHTML = `
@@ -1015,10 +1179,10 @@ async function loadClans() {
         <div style="font-family:var(--font-title);font-size:14px;font-weight:700;margin:4px 0">${G.clan.name}</div>
         <div style="font-size:11px;color:var(--text2)">Лидер: ${G.clan.leader}</div>
         <div style="font-size:11px;color:var(--text2)">⚡ Мощь: ${(G.clan.power||0).toLocaleString()}</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:4px">Побед в войне: ${G.clan.warWins||0} | Поражений: ${G.clan.warLosses||0}</div>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:8px">
-        <button class="btn btn-sm btn-primary" onclick="attackClanWar()">⚔️ Атаковать</button>
-        <button class="btn btn-sm btn-secondary" onclick="inviteFriendToClan()">👥 Пригласить друга</button>
+        <button class="btn btn-sm btn-secondary" onclick="inviteFriendToClan()">👥 Пригласить</button>
         <button class="btn btn-sm btn-danger" onclick="leaveClan()">🚪 Выйти</button>
       </div>
     `;
@@ -1048,26 +1212,115 @@ async function loadClans() {
     </div>
   `).join('');
 
-  // Clan war
+  // Clan war section
+  renderClanWar(clans);
+}
+
+function renderClanWar(clans) {
   const warDiv = document.getElementById('clan-war-content');
-  if (G.clan) {
-    const opponents = (clans.length ? clans : DEMO_CLANS).filter(c => c.name !== G.clan.name).slice(0, 3);
-    warDiv.innerHTML = opponents.map(c => `
-      <div style="display:flex;align-items:center;gap:8px;padding:8px;background:var(--bg3);border-radius:8px;margin-bottom:6px">
-        <span style="font-size:20px">${c.emoji}</span>
-        <div style="flex:1">
-          <div style="font-size:12px;font-weight:600">${c.name}</div>
-          <div style="font-size:10px;color:var(--text2)">⚡ ${(c.power||0).toLocaleString()}</div>
+  if (!warDiv) return;
+  if (!G.clan) { warDiv.innerHTML = '<div style="font-size:11px;color:var(--text3);padding:6px">Вступи в клан чтобы воевать</div>'; return; }
+
+  const now = Date.now();
+  const cooldownLeft = Math.max(0, _clanWarCooldown - now);
+  const onCooldown = cooldownLeft > 0;
+  const opponents = (clans.length ? clans : DEMO_CLANS).filter(c => c.name !== G.clan.name).slice(0, 4);
+
+  warDiv.innerHTML = `
+    <div style="font-size:11px;color:var(--text2);margin-bottom:10px;padding:8px;background:var(--bg3);border-radius:8px">
+      ⚡ Мощь клана: <strong style="color:var(--gold)">${(G.clan.power||0).toLocaleString()}</strong>
+      ${onCooldown ? `<span style="float:right;color:var(--danger)">⏳ ${fmtTime(cooldownLeft)}</span>` : '<span style="float:right;color:var(--success)">✅ Готов</span>'}
+    </div>
+    ${opponents.map(c => {
+      const myPower = G.clan.power || G.elo * 10;
+      const winPct = Math.round(Math.min(80, Math.max(20, myPower / (myPower + (c.power||1000)) * 100)));
+      const stronger = (c.power||1000) > myPower;
+      return `
+      <div style="padding:10px;background:var(--bg3);border:1px solid ${stronger?'rgba(239,68,68,0.3)':'rgba(16,185,129,0.3)'};border-radius:10px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span style="font-size:22px">${c.emoji}</span>
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:700">${c.name}</div>
+            <div style="font-size:10px;color:var(--text2)">⚡ ${(c.power||0).toLocaleString()} | Шанс победы: <span style="color:${winPct>=50?'var(--success)':'var(--danger)'}">${winPct}%</span></div>
+          </div>
         </div>
-        <button class="btn btn-xs btn-danger" onclick="attackClan('${c.name}',${c.power||1000})">⚔️</button>
-      </div>
-    `).join('') || '<div style="font-size:11px;color:var(--text3);padding:6px">Нет противников</div>';
-  } else {
-    warDiv.innerHTML = '<div style="font-size:11px;color:var(--text3);padding:6px">Вступи в клан чтобы воевать</div>';
+        <div style="display:flex;align-items:center;gap:6px">
+          <div style="flex:1;background:rgba(0,0,0,0.3);border-radius:6px;height:6px;overflow:hidden">
+            <div style="width:${winPct}%;height:100%;background:${winPct>=50?'var(--success)':'var(--danger)'};border-radius:6px"></div>
+          </div>
+          <button class="btn btn-xs btn-danger" onclick="attackClan('${c.name}',${c.power||1000})" ${onCooldown?'disabled':''}>⚔️ Атака</button>
+        </div>
+      </div>`;
+    }).join('')}
+    ${onCooldown ? `<div style="text-align:center;font-size:11px;color:var(--text3);padding:6px">Следующая атака через ${fmtTime(cooldownLeft)}</div>` : ''}
+  `;
+
+  // Auto-refresh countdown
+  if (onCooldown) {
+    setTimeout(() => {
+      const wd = document.getElementById('clan-war-content');
+      if (wd) renderClanWar(clans);
+    }, 1000);
   }
 }
 
-function createClan() {
+function attackClan(targetName, targetPower) {
+  if (!G.clan) { toast('Ты не в клане!', 'error'); return; }
+  const now = Date.now();
+  if (now < _clanWarCooldown) { toast(`⏳ Подожди ${fmtTime(_clanWarCooldown - now)}`, 'error'); return; }
+
+  const myPower = G.clan.power || G.elo * 10;
+  const winChance = Math.min(0.8, Math.max(0.2, myPower / (myPower + targetPower)));
+  const won = Math.random() < winChance;
+
+  // Auto-battle log
+  const rounds = Math.floor(3 + Math.random() * 5);
+  const log = [];
+  let ourHp = myPower, theirHp = targetPower;
+  for (let i = 1; i <= rounds; i++) {
+    const ourAtk = Math.floor(myPower * (0.05 + Math.random() * 0.08));
+    const theirAtk = Math.floor(targetPower * (0.04 + Math.random() * 0.07));
+    theirHp -= ourAtk;
+    ourHp -= theirAtk;
+    log.push(`Раунд ${i}: Мы нанесли <b>${ourAtk.toLocaleString()}</b> | Они нанесли <b>${theirAtk.toLocaleString()}</b>`);
+    if (theirHp <= 0 || ourHp <= 0) break;
+  }
+
+  if (won) {
+    const powerGain = Math.floor(targetPower * 0.1);
+    G.clan.power = (G.clan.power||0) + powerGain;
+    G.clan.warWins = (G.clan.warWins||0) + 1;
+    G.coins += 300; G.wins++;
+    log.push(`<span style="color:var(--success)">🏆 Клан победил! +${powerGain} мощи +🪙300</span>`);
+  } else {
+    const powerLoss = Math.floor(myPower * 0.05);
+    G.clan.power = Math.max(0, (G.clan.power||0) - powerLoss);
+    G.clan.warLosses = (G.clan.warLosses||0) + 1;
+    log.push(`<span style="color:var(--danger)">💀 Поражение от "${targetName}". -${powerLoss} мощи</span>`);
+  }
+
+  _clanWarCooldown = Date.now() + 120000; // 2 minute cooldown
+  saveGame(); updateHeader();
+
+  // Show battle result modal
+  openModal(`⚔️ Война кланов: ${won?'Победа!':'Поражение'}`, `
+    <div style="background:${won?'rgba(16,185,129,0.1)':'rgba(239,68,68,0.1)'};border:2px solid ${won?'var(--success)':'var(--danger)'};border-radius:12px;padding:14px;margin-bottom:12px;text-align:center">
+      <div style="font-size:48px">${won?'🏆':'💀'}</div>
+      <div style="font-size:16px;font-weight:900;color:${won?'var(--success)':'var(--danger)'}">${won?'ПОБЕДА!':'ПОРАЖЕНИЕ'}</div>
+      <div style="font-size:11px;color:var(--text2);margin-top:4px">Против: ${targetName}</div>
+    </div>
+    <div style="background:var(--bg3);border-radius:10px;padding:10px;font-size:11px;max-height:160px;overflow-y:auto;line-height:1.8">
+      ${log.map(l=>`<div>${l}</div>`).join('')}
+    </div>
+    <button class="btn btn-primary btn-full" style="margin-top:12px" onclick="closeModal();renderClans()">← Назад</button>
+  `);
+}
+
+function attackClanWar() {
+  const opponents = DEMO_CLANS.filter(c => c.name !== G.clan?.name);
+  const target = opponents[Math.floor(Math.random()*opponents.length)];
+  if (target) attackClan(target.name, target.power);
+}
   openModal('➕ Создать клан', `
     <input id="clan-name-input" class="input" placeholder="Название клана" style="margin-bottom:8px">
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px" id="clan-emoji-row">
@@ -1125,31 +1378,29 @@ async function leaveClan() {
   renderClans();
 }
 
-function attackClan(targetName, targetPower) {
-  if (!G.clan) { toast('Ты не в клане!', 'error'); return; }
-  const myPower = G.clan.power || G.elo * 10;
-  const winChance = Math.min(0.8, Math.max(0.2, myPower / (myPower + targetPower)));
-  const won = Math.random() < winChance;
-  if (won) {
-    const powerGain = Math.floor(targetPower * 0.1);
-    G.clan.power = (G.clan.power||0) + powerGain;
-    G.coins += 300; G.wins++;
-    toast(`⚔️ Победа над "${targetName}"! +${powerGain} мощи клану`, 'success');
-  } else {
-    const powerLoss = Math.floor(myPower * 0.05);
-    G.clan.power = Math.max(0, (G.clan.power||0) - powerLoss);
-    toast(`💀 Поражение от "${targetName}". -${powerLoss} мощи`, 'error');
-  }
-  saveGame(); updateHeader(); renderClans();
-}
-
-function attackClanWar() {
-  const opponents = DEMO_CLANS.filter(c => c.name !== G.clan?.name);
-  const target = opponents[Math.floor(Math.random()*opponents.length)];
-  if (target) attackClan(target.name, target.power);
-}
-
 async function inviteFriendToClan() {
+  if (!G.token) { toast('Нужна авторизация', 'error'); return; }
+  try {
+    const res = await fetch('/api/players/friends/list', { headers:{'Authorization':'Bearer '+G.token} });
+    const data = await res.json();
+    const friends = (data.friends||[]).filter(f => f.status==='accepted');
+    if (!friends.length) { toast('Нет друзей для приглашения', 'error'); return; }
+    openModal('👥 Пригласить в клан', friends.map(f => `
+      <div style="display:flex;align-items:center;gap:10px;padding:8px;background:var(--bg3);border-radius:8px;margin-bottom:6px">
+        <span style="font-size:20px">${f.avatar||'🦛'}</span>
+        <div style="flex:1"><div style="font-weight:600;font-size:12px">${f.username}</div></div>
+        <button class="btn btn-xs btn-primary" onclick="sendClanInvite('${f.id}','${f.username}')">📨 Пригласить</button>
+      </div>
+    `).join(''));
+  } catch { toast('Ошибка загрузки', 'error'); }
+}
+
+async function sendClanInvite(friendId, friendName) {
+  if (window.hwSocket) window.hwSocket.emit('clan_invite', { to_id: friendId, clan: G.clan });
+  toast(`📨 Приглашение отправлено @${friendName}`, 'success'); closeModal();
+}
+
+function createClan() {
   if (!G.token) { toast('Нужна авторизация', 'error'); return; }
   try {
     const res = await fetch('/api/players/friends/list', { headers:{'Authorization':'Bearer '+G.token} });
@@ -1646,6 +1897,13 @@ async function renderBossFightTab() {
             </div>
           `).join('')}
         </div>
+        <div class="card" style="margin-top:12px">
+          <div class="card-title">🔗 Войти по коду</div>
+          <div style="display:flex;gap:8px">
+            <input id="invite-code-input" class="form-input" placeholder="Код приглашения..." style="flex:1;text-transform:uppercase">
+            <button class="btn btn-primary" onclick="joinBossLobbyByCode()">▶ Войти</button>
+          </div>
+        </div>
       </div>
       <div>
         <div class="card" id="boss-lobby-panel">
@@ -1655,6 +1913,47 @@ async function renderBossFightTab() {
       </div>
     </div>
   `;
+}
+
+async function joinBossLobbyByCode() {
+  const input = document.getElementById('invite-code-input');
+  const code = input?.value?.trim().toUpperCase();
+  if (!code) { toast('Введи код приглашения', 'error'); return; }
+  if (!G.token) { toast('Нужна авторизация', 'error'); return; }
+  try {
+    const res = await fetch(`/api/bossfights/join/${code}`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+G.token} });
+    const data = await res.json();
+    if (data.success) {
+      const { lobby } = data;
+      if (window.hwSocket) window.hwSocket.emit('join_boss_lobby', { lobby_id: lobby.id });
+      showBossLobby(lobby.id, code, lobby.boss, false, lobby.members || []);
+      toast(`👹 Ты в лобби!`, 'success');
+    } else {
+      toast(data.error || 'Ошибка', 'error');
+    }
+  } catch { toast('Ошибка сервера', 'error'); }
+}
+
+async function joinBossLobbyById(lobbyId) {
+  if (!G.token) { toast('Нужна авторизация', 'error'); return; }
+  setTabByName('bossfight');
+  setTimeout(async () => {
+    try {
+      const res = await fetch(`/api/bossfights/${lobbyId}`, { headers:{'Authorization':'Bearer '+G.token} });
+      const data = await res.json();
+      if (!data.boss) { toast('Лобби не найдено', 'error'); return; }
+      // Join as member
+      const joinRes = await fetch(`/api/bossfights/join/${data.invite_code}`, { method:'POST', headers:{'Authorization':'Bearer '+G.token} });
+      const joinData = await joinRes.json();
+      if (joinData.success || joinData.error === 'Ты уже в лобби') {
+        const members = joinData.lobby?.members || data.members || [];
+        showBossLobby(lobbyId, data.invite_code, data.boss, false, members);
+        toast(`👹 Ты в лобби! Босс: ${data.boss.name}`, 'success');
+      } else {
+        toast(joinData.error || 'Ошибка', 'error');
+      }
+    } catch { toast('Ошибка подключения', 'error'); }
+  }, 400);
 }
 
 async function createBossLobby(bossId) {
