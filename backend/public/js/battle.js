@@ -182,12 +182,17 @@ function renderBattle() {
   const pPct = Math.max(0, player.hp / player.maxHp * 100);
   const ePct = Math.max(0, enemy.hp / enemy.maxHp * 100);
 
-  const mutBadges = (muts) => (muts || []).map(mId => {
+  const parseArr = (val) => {
+    if (Array.isArray(val)) return val;
+    if (!val) return [];
+    try { const p = JSON.parse(val); return Array.isArray(p) ? p : []; } catch { return []; }
+  };
+  const mutBadges = (muts) => parseArr(muts).map(mId => {
     const m = MUTATIONS.find(x => x.id === mId);
     return m ? `<span title="${m.desc}" style="font-size:13px">${m.emoji}</span>` : '';
   }).join('');
 
-  const abilBadges = (abs) => (abs || []).map(abId => {
+  const abilBadges = (abs) => parseArr(abs).map(abId => {
     const ab = ABILITIES.find(x => x.id === abId);
     return ab ? `<span title="${ab.desc}" style="font-size:13px">${ab.emoji}</span>` : '';
   }).join('');
