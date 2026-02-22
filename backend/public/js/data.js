@@ -36,7 +36,7 @@ const HIPPO_EMOJIS = [
   '🦁','🐯','🐻','🦊','🐺','🦝','🐨','🐼',
 ];
 
-// MUTATIONS — reworked to be logical
+// MUTATIONS
 const MUTATIONS = [
   { id:'fire',    emoji:'🔥', name:'Огненная шкура',   desc:'+15% урона в атаке',      atk_bonus:0.15 },
   { id:'ice',     emoji:'❄️', name:'Ледяной панцирь',  desc:'-20% входящего урона',    def_bonus:0.20 },
@@ -184,24 +184,26 @@ const VALHALLA_BOSSES = [
 // ABILITIES — equippable active skills (one per hippo, once per battle)
 // ========================
 const ABILITIES = [
-  // Damage
-  { id:'smash',      emoji:'💥', name:'Сокрушительный удар', desc:'Наносит 250% урона от ATK',       type:'damage',   value:2.5,  rarity:'uncommon' },
-  { id:'fireball',   emoji:'🔥', name:'Огненный шар',        desc:'180% урона, поджигает (+5% HP/ход)', type:'damage', value:1.8,  rarity:'rare'     },
-  { id:'earthquake', emoji:'🌍', name:'Землетрясение',        desc:'200% урона, оглушает на 1 ход',  type:'stun',     value:2.0,  rarity:'rare'     },
-  { id:'icebolt',    emoji:'❄️', name:'Ледяная стрела',       desc:'150% урона, -30% защиты врага',  type:'debuff',   value:1.5,  rarity:'rare'     },
-  { id:'thunder',    emoji:'⚡',  name:'Удар молнии',          desc:'300% урона, 50% крит шанс',      type:'damage',   value:3.0,  rarity:'epic'     },
-  { id:'poison',     emoji:'☠️', name:'Смертельный яд',       desc:'10% макс HP врага каждый ход (3 хода)', type:'dot', value:0.10, rarity:'epic'  },
-  // Heal/Defense
-  { id:'regen',      emoji:'💚', name:'Мощное восстановление',desc:'Восстанавливает 40% макс HP',    type:'heal',     value:0.40, rarity:'uncommon' },
-  { id:'shield',     emoji:'🛡️', name:'Железный щит',         desc:'-60% входящего урона на 2 хода', type:'shield',  value:0.60, rarity:'rare'     },
-  { id:'vampbite',   emoji:'🧛', name:'Вампирский укус',       desc:'150% урона, 80% лайфстил',      type:'lifesteal',value:1.5, rarity:'epic'     },
-  { id:'battlecry',  emoji:'📯', name:'Боевой клич',           desc:'+50% атаки на 3 хода',           type:'buff',     value:1.5,  rarity:'rare'     },
-  // Utility
-  { id:'shadowstep', emoji:'👻', name:'Шаг в тень',            desc:'Пропустить атаку врага (уклон 100%)', type:'dodge', value:1.0, rarity:'epic'  },
-  { id:'berserk',    emoji:'😤', name:'Безумие',               desc:'+100% урона, -30% защиты на 3 хода', type:'buff', value:2.0, rarity:'legendary'},
-  { id:'timelock',   emoji:'⏳', name:'Остановка времени',     desc:'Враг пропускает 2 хода',          type:'stun',    value:2.0,  rarity:'legendary'},
-  { id:'meteor',     emoji:'☄️', name:'Метеорит',              desc:'400% урона, игнор защиты',        type:'damage',  value:4.0,  rarity:'mythic'   },
-  { id:'rebirth',    emoji:'🔆', name:'Возрождение',           desc:'Восст. до 100% HP один раз',     type:'revive',   value:1.0,  rarity:'mythic'   },
+  { id:'ab_firestorm',    emoji:'🔥', name:'Огненный Шторм',      desc:'Наносит 3x урон, но пропускает следующий ход',    rarity:'rare',      cost_gems:30,
+    effect:{ type:'nuke', dmgMult:3, skipNext:true } },
+  { id:'ab_iceshield',    emoji:'🧊', name:'Ледяной Щит',         desc:'Блокирует 50% урона 2 хода',                      rarity:'rare',      cost_gems:25,
+    effect:{ type:'shield', reduction:0.5, turns:2 } },
+  { id:'ab_blooddrain',   emoji:'🩸', name:'Выкачать Кровь',      desc:'Крадёт 40% HP противника',                        rarity:'epic',      cost_gems:60,
+    effect:{ type:'drain', amount:0.4 } },
+  { id:'ab_thunderstrike',emoji:'⚡', name:'Удар Грома',          desc:'2x урон + шанс ошеломить (пропуск хода)',         rarity:'epic',      cost_gems:55,
+    effect:{ type:'stun', dmgMult:2, stunChance:0.4 } },
+  { id:'ab_berserkrush',  emoji:'😤', name:'Берсерк Раш',         desc:'3 атаки подряд, каждая слабее',                   rarity:'epic',      cost_gems:65,
+    effect:{ type:'multistrike', hits:3, dmgMult:0.7 } },
+  { id:'ab_holylight',    emoji:'✨', name:'Святой Свет',         desc:'Лечит 50% HP и снимает все дебаффы',              rarity:'legendary', cost_gems:100,
+    effect:{ type:'bigHeal', amount:0.5 } },
+  { id:'ab_shadowstep',   emoji:'👻', name:'Шаг в Тень',          desc:'Уклоняется от следующей атаки + контратака',      rarity:'legendary', cost_gems:120,
+    effect:{ type:'dodge_counter', dmgMult:1.5 } },
+  { id:'ab_ragnarok',     emoji:'💥', name:'Рагнарёк',            desc:'Мгновенно убивает если HP врага < 30%',           rarity:'mythic',    cost_gems:200,
+    effect:{ type:'execute', threshold:0.3 } },
+  { id:'ab_phoenix',      emoji:'🦅', name:'Возрождение Феникса', desc:'Воскрешает с 30% HP (раз за бой)',                rarity:'mythic',    cost_gems:250,
+    effect:{ type:'revive', amount:0.3 } },
+  { id:'ab_timewarp',     emoji:'⏳', name:'Изгиб Времени',       desc:'Даёт лишний ход в этом раунде',                   rarity:'mythic',    cost_gems:180,
+    effect:{ type:'extra_turn' } },
 ];
 
 const ABILITY_RARITIES = { uncommon:'Необычный', rare:'Редкий', epic:'Эпический', legendary:'Легендарный', mythic:'Мифический' };
@@ -241,30 +243,4 @@ const DEMO_CLANS = [
   { id:'c3', name:'Речные Духи',     emoji:'🌊', power:8000,  members:5,  leader:'БолотникSam',    war:false },
   { id:'c4', name:'Огненная Степь',  emoji:'🔥', power:18000, members:10, leader:'ОгненныйДух',    war:true  },
   { id:'c5', name:'Ледяные Стражи',  emoji:'❄️', power:12000, members:7,  leader:'ЛедяноеСердце',  war:false },
-];
-
-// ========================
-// HIPPO ABILITIES (equippable active skills)
-// ========================
-const ABILITIES = [
-  { id:'ab_firestorm',  emoji:'🔥', name:'Огненный Шторм',   desc:'Наносит 3x урон, но пропускает следующий ход',  rarity:'rare',      cost_gems:30,
-    effect:{ type:'nuke', dmgMult:3, skipNext:true } },
-  { id:'ab_iceshield',  emoji:'🧊', name:'Ледяной Щит',      desc:'Блокирует 50% урона 2 хода',                   rarity:'rare',      cost_gems:25,
-    effect:{ type:'shield', reduction:0.5, turns:2 } },
-  { id:'ab_blooddrain', emoji:'🩸', name:'Выкачать Кровь',   desc:'Крадёт 40% HP противника',                     rarity:'epic',      cost_gems:60,
-    effect:{ type:'drain', amount:0.4 } },
-  { id:'ab_thunderstrike',emoji:'⚡',name:'Удар Грома',      desc:'2x урон + шанс ошеломить (пропуск хода)',       rarity:'epic',      cost_gems:55,
-    effect:{ type:'stun', dmgMult:2, stunChance:0.4 } },
-  { id:'ab_berserkrush', emoji:'😤', name:'Берсерк Раш',     desc:'3 атаки подряд, каждая слабее',                 rarity:'epic',      cost_gems:65,
-    effect:{ type:'multistrike', hits:3, dmgMult:0.7 } },
-  { id:'ab_holylight',  emoji:'✨', name:'Святой Свет',      desc:'Лечит 50% HP и снимает все дебаффы',            rarity:'legendary', cost_gems:100,
-    effect:{ type:'bigHeal', amount:0.5 } },
-  { id:'ab_shadowstep', emoji:'👻', name:'Шаг в Тень',       desc:'Уклоняется от следующей атаки + контратака',    rarity:'legendary', cost_gems:120,
-    effect:{ type:'dodge_counter', dmgMult:1.5 } },
-  { id:'ab_ragnarok',   emoji:'💥', name:'Рагнарёк',         desc:'Мгновенно убивает если HP врага < 30%',         rarity:'mythic',    cost_gems:200,
-    effect:{ type:'execute', threshold:0.3 } },
-  { id:'ab_phoenix',    emoji:'🦅', name:'Возрождение Феникса',desc:'Воскрешает с 30% HP (раз за бой)',            rarity:'mythic',    cost_gems:250,
-    effect:{ type:'revive', amount:0.3 } },
-  { id:'ab_timewarp',   emoji:'⏳', name:'Изгиб Времени',    desc:'Даёт лишний ход в этом раунде',                 rarity:'mythic',    cost_gems:180,
-    effect:{ type:'extra_turn' } },
 ];
