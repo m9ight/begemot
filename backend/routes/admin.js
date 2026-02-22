@@ -35,9 +35,10 @@ router.get('/players', adminOnly, (req, res) => {
 router.post('/players/:id/ban', adminOnly, (req, res) => {
   const { banned } = req.body;
   stmts.setBanned.run(banned ? 1 : 0, req.params.id);
-  // Signal global io to kick
   if (req.app.get('io') && banned) {
-    req.app.get('io').to(`player:${req.params.id}`).emit('banned', { reason: 'Аккаунт заблокирован администратором' });
+    req.app.get('io').to(`player:${req.params.id}`).emit('banned', {
+      reason: 'Аккаунт заблокирован. Для связи с администратором напишите казаху.'
+    });
   }
   res.json({ success: true });
 });
@@ -51,10 +52,27 @@ router.post('/players/:id/admin', adminOnly, (req, res) => {
 
 // Give resources
 router.post('/players/:id/give', adminOnly, (req, res) => {
-  const { coins, gems, elo } = req.body;
+  const { coins, gems, elo, level } = req.body;
   if (coins !== undefined) stmts.giveCoins.run(parseInt(coins) || 0, req.params.id);
   if (gems !== undefined) stmts.giveGems.run(parseInt(gems) || 0, req.params.id);
   if (elo !== undefined) stmts.setElo.run(parseInt(elo) || 1000, req.params.id);
+  if (level !== undefined) db.prepare('UPDATE players SET level=? WHERE id=?').run(Math.max(1, parseInt(level)||1), req.params.id);
+
+  // Get updated player state to push to client
+  const updated = stmts.getPlayerById.get(req.params.id);
+  if (updated && req.app.get('io')) {
+    const parts = [];
+    if (coins !== undefined) parts.push(`+${coins}🪙`);
+    if (gems !== undefined) parts.push(`+${gems}💎`);
+    if (elo !== undefined) parts.push(`ELO→${elo}`);
+    if (level !== undefined) parts.push(`Ур.→${level}`);
+    req.app.get('io').to(`player:${req.params.id}`).emit('resource_update', {
+      coins: updated.coins,
+      gems: updated.gems,
+      level: updated.level,
+      message: `Администратор выдал: ${parts.join(' ')}`
+    });
+  }
   res.json({ success: true });
 });
 
