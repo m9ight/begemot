@@ -1321,62 +1321,6 @@ function attackClanWar() {
   const target = opponents[Math.floor(Math.random()*opponents.length)];
   if (target) attackClan(target.name, target.power);
 }
-  openModal('➕ Создать клан', `
-    <input id="clan-name-input" class="input" placeholder="Название клана" style="margin-bottom:8px">
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px" id="clan-emoji-row">
-      ${['🐺','⚔️','🔥','🏔️','🌊','🦅','🌑','💀','🌪️','🏰'].map(e=>`
-        <button style="font-size:20px;background:var(--bg3);border:2px solid var(--border);border-radius:8px;padding:4px 8px;cursor:pointer"
-          onclick="this.parentNode.querySelectorAll('button').forEach(b=>b.style.borderColor='var(--border)');this.style.borderColor='var(--accent)';document.getElementById('clan-emoji-selected').value='${e}'">${e}</button>
-      `).join('')}
-    </div>
-    <input type="hidden" id="clan-emoji-selected" value="🏰">
-    <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Стоимость: 💎 50</div>
-    <button class="btn btn-primary btn-full" onclick="confirmCreateClan()">✅ Создать</button>
-  `);
-}
-
-async function confirmCreateClan() {
-  const name = document.getElementById('clan-name-input')?.value?.trim();
-  const emoji = document.getElementById('clan-emoji-selected')?.value || '🏰';
-  if (!name || name.length < 2) { toast('Слишком короткое название', 'error'); return; }
-  if (G.gems < 50) { toast('Нужно 💎 50', 'error'); return; }
-  if (G.token) {
-    try {
-      const res = await fetch('/api/clans/create', {
-        method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+G.token},
-        body: JSON.stringify({ name, emoji })
-      });
-      const d = await res.json();
-      if (!d.success && !d.id) { toast(d.error||'Ошибка', 'error'); return; }
-    } catch {}
-  }
-  G.gems -= 50;
-  G.clan = { id:'c_'+Date.now(), name, emoji, leader: G.playerName, power: G.elo * 10, members: 1 };
-  closeModal(); saveGame(); updateHeader();
-  toast(`🏰 Клан "${name}" создан!`, 'success');
-  renderClans();
-}
-
-async function joinClan(id, name, emoji, leader) {
-  if (G.clan) { toast('Сначала выйди из текущего клана', 'error'); return; }
-  if (G.token) {
-    try {
-      await fetch(`/api/clans/${id}/join`, { method:'POST', headers:{'Authorization':'Bearer '+G.token} });
-    } catch {}
-  }
-  G.clan = { id, name, emoji, leader, power: 5000, members: 1 };
-  saveGame(); toast(`🏰 Ты вступил в "${name}"!`, 'success');
-  renderClans();
-}
-
-async function leaveClan() {
-  if (!confirm('Покинуть клан?')) return;
-  if (G.token && G.clan) {
-    try { await fetch(`/api/clans/${G.clan.id}/leave`, { method:'POST', headers:{'Authorization':'Bearer '+G.token} }); } catch {}
-  }
-  G.clan = null; saveGame(); toast('🚪 Вышел из клана');
-  renderClans();
-}
 
 async function inviteFriendToClan() {
   if (!G.token) { toast('Нужна авторизация', 'error'); return; }
@@ -1401,25 +1345,18 @@ async function sendClanInvite(friendId, friendName) {
 }
 
 function createClan() {
-  if (!G.token) { toast('Нужна авторизация', 'error'); return; }
-  try {
-    const res = await fetch('/api/players/friends/list', { headers:{'Authorization':'Bearer '+G.token} });
-    const data = await res.json();
-    const friends = (data.friends||[]).filter(f => f.status==='accepted');
-    if (!friends.length) { toast('Нет друзей для приглашения', 'error'); return; }
-    openModal('👥 Пригласить в клан', friends.map(f => `
-      <div style="display:flex;align-items:center;gap:10px;padding:8px;background:var(--bg3);border-radius:8px;margin-bottom:6px">
-        <span style="font-size:20px">${f.avatar||'🦛'}</span>
-        <div style="flex:1"><div style="font-weight:600;font-size:12px">${f.username}</div></div>
-        <button class="btn btn-xs btn-primary" onclick="sendClanInvite('${f.id}','${f.username}')">📨 Пригласить</button>
-      </div>
-    `).join(''));
-  } catch { toast('Ошибка загрузки', 'error'); }
-}
-
-async function sendClanInvite(friendId, friendName) {
-  if (window.hwSocket) window.hwSocket.emit('clan_invite', { to_id: friendId, clan: G.clan });
-  toast(`📨 Приглашение отправлено @${friendName}`, 'success'); closeModal();
+  openModal('➕ Создать клан', `
+    <input id="clan-name-input" class="form-input" placeholder="Название клана" style="margin-bottom:8px;width:100%">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+      ${['🐺','⚔️','🔥','🏔️','🌊','🦅','🌑','💀','🌪️','🏰'].map(e=>`
+        <button style="font-size:20px;background:var(--bg3);border:2px solid var(--border);border-radius:8px;padding:4px 8px;cursor:pointer"
+          onclick="this.parentNode.querySelectorAll('button').forEach(b=>b.style.borderColor='var(--border)');this.style.borderColor='var(--accent)';document.getElementById('clan-emoji-selected').value='${e}'">${e}</button>
+      `).join('')}
+    </div>
+    <input type="hidden" id="clan-emoji-selected" value="🏰">
+    <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Стоимость: 💎 50</div>
+    <button class="btn btn-primary btn-full" onclick="confirmCreateClan()">✅ Создать</button>
+  `);
 }
 
 // ========================
