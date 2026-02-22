@@ -210,6 +210,21 @@ io.on('connection', (socket) => {
     io.to(`player:${to_id}`).emit('challenge_received', { from_id: player_id, from_name: username, from_elo: player.elo });
   });
 
+  // Boss lobby invite forwarding
+  socket.on('boss_lobby_invite', ({ to_id, lobby_id, boss_name }) => {
+    io.to(`player:${to_id}`).emit('boss_lobby_invite', {
+      from_id: player_id, from_name: username, lobby_id, boss_name: boss_name || 'Босс'
+    });
+    console.log(`📨 ${username} invited ${to_id} to boss lobby ${lobby_id}`);
+  });
+
+  // Clan invite forwarding
+  socket.on('clan_invite', ({ to_id, clan }) => {
+    io.to(`player:${to_id}`).emit('clan_invite', {
+      from_id: player_id, from_name: username, clan
+    });
+  });
+
   // ========================
   // DISCONNECT
   // ========================
