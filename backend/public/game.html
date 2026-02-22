@@ -345,6 +345,7 @@ if (G.hippos.length === 0) {
 // Init socket if logged in
 if (G.token) {
   initSocket();
+  initWorldSocketListeners();
 } else {
   // Offline indicator
   const el = document.getElementById('online-count-display');
