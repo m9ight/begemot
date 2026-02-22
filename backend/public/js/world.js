@@ -4,7 +4,10 @@
 function getHippoAbilities(h) {
   if (!h) return [];
   if (Array.isArray(h.abilities)) return h.abilities;
-  try { return JSON.parse(h.abilities || '[]'); } catch { return []; }
+  try {
+    const parsed = JSON.parse(h.abilities || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch { return []; }
 }
 function getHippoMutations(h) {
   if (!h) return [];
@@ -546,20 +549,7 @@ function unequipSlot(slot) {
   saveGame(); renderInventory();
 }
 
-function renderInventoryGrid() {
-  const div = document.getElementById('inv-items-grid');
-  const items = invFilter==='all' ? G.inventory : G.inventory.filter(i=>i.type===invFilter);
-  if (!items.length) { div.innerHTML='<div class="empty-state"><span class="empty-icon">🎒</span><div class="empty-text">Пусто</div></div>'; return; }
-  div.innerHTML = items.map((item,i) => `
-    <div class="inv-item ${G.selectedUpgradeItem===i?'selected':''}" onclick="selectUpgradeItem(${G.inventory.indexOf(item)})" style="border-color:${getRarityColor(item.rarity||'common')}">
-      <span style="font-size:22px">${item.emoji}</span>
-      <div style="font-size:11px;font-weight:700;margin-top:2px">${item.name}</div>
-      ${item.upgradeLevel>0?`<div style="font-size:10px;color:var(--success)">+${item.upgradeLevel}</div>`:''}
-      <div style="font-size:9px;color:${getRarityColor(item.rarity||'common')}">${getRarityName(item.rarity||'common')}</div>
-      ${item.equipped_to?`<div style="font-size:9px;color:var(--accent)">📌 Надет</div>`:''}
-    </div>
-  `).join('');
-}
+// renderInventoryGrid is defined above (line ~368), this duplicate removed
 
 function renderEquipHippoSelect() {
   const div = document.getElementById('equip-hippo-select');
